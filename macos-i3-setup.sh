@@ -2,76 +2,78 @@
 
 set -e
 
-echo "🚀 Удаляем старый конфиг i3..."
-rm -rf ~/.config/i3
-mkdir -p ~/.config/i3
-
-echo "📦 Обновляем систему и ставим пакеты..."
+echo "[1/9] Обновляем систему..."
 sudo pacman -Syu --noconfirm
-sudo pacman -S --noconfirm i3-wm i3status i3lock dmenu rofi alacritty zsh fzf
 
-echo "🎨 Ставим тему и шрифты..."
-sudo pacman -S --noconfirm arc-gtk-theme ttf-jetbrains-mono ttf-font-awesome
+echo "[2/9] Устанавливаем базовые пакеты..."
+sudo pacman -S --noconfirm --needed \
+    i3-gaps i3status i3lock kitty thunar rofi picom polybar feh \
+    ttf-dejavu ttf-font-awesome noto-fonts \
+    arc-gtk-theme papirus-icon-theme lxappearance \
+    zsh wget curl git unzip
 
-echo "⚡ Настраиваем i3..."
-cat > ~/.config/i3/config <<'EOF'
-# МОДИФИКАТОР (Alt вместо Win)
-set \$mod Mod1
+echo "[3/9] Ставим oh-my-zsh..."
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    chsh -s $(which zsh)
+fi
 
-# ТЕРМИНАЛ
-bindsym \$mod+Return exec alacritty
+echo "[4/9] Настраиваем i3..."
+mkdir -p ~/.config/i3
+cat << 'EOF' > ~/.config/i3/config
+set \$mod Mod1  # Alt как Command
 
-# ВЫХОД
+# Основные хоткеи
+bindsym \$mod+Return exec kitty
+bindsym \$mod+d exec rofi -show drun
+bindsym \$mod+Tab exec "rofi -show window"
 bindsym \$mod+Shift+e exec "i3-msg exit"
+bindsym \$mod+Shift+q kill
 
-# РЕСТАРТ i3
+# Открытие Thunar в /
+bindsym \$mod+f exec thunar /
+
+# Плавающие окна по умолчанию
+for_window [class=".*"] floating enable
+
+# Перезапуск i3
 bindsym \$mod+Shift+r restart
 
-# СПИСОК ОКОН (Alt+Tab)
-bindsym \$mod+Tab exec rofi -show window
-
-# МЕНЮ (Alt+D)
-bindsym \$mod+d exec rofi -show drun
-
-# ОТКРЫТЬ ДОМАШНЮЮ ПАПКУ (Alt+F)
-bindsym \$mod+f exec alacritty --working-directory \$HOME
-
-# ОТКРЫТЬ ЗАГРУЗКИ (Alt+Shift+F)
-bindsym \$mod+Shift+f exec alacritty --working-directory \$HOME/Загрузки
-
-# СПОТЛАЙТ (Alt+Space)
-bindsym \$mod+space exec rofi -show run
-
-# УПРАВЛЕНИЕ ОКНАМИ
-bindsym \$mod+h focus left
-bindsym \$mod+l focus right
-bindsym \$mod+k focus up
-bindsym \$mod+j focus down
-
-bindsym \$mod+Shift+h move left
-bindsym \$mod+Shift+l move right
-bindsym \$mod+Shift+k move up
-bindsym \$mod+Shift+j move down
-
-# WORKSPACES
-set \$ws1 "1"
-set \$ws2 "2"
-set \$ws3 "3"
-
-bindsym \$mod+1 workspace \$ws1
-bindsym \$mod+2 workspace \$ws2
-bindsym \$mod+3 workspace \$ws3
-
-# ВНЕШНИЙ ВИД
-new_window pixel 2
-font pango:JetBrains Mono 12
-client.focused      #4c7899 #285577 #ffffff #2e9ef4 #285577
-client.unfocused    #333333 #222222 #888888 #292d2e #222222
+# Autostart
+exec_always --no-startup-id feh --bg-fill ~/wallpaper.jpg
+exec_always --no-startup-id picom --config ~/.config/picom.conf
+exec_always --no-startup-id polybar example
 EOF
 
-echo "✅ Конфиг i3 обновлён!"
+echo "[5/9] Конфиг Polybar..."
+mkdir -p ~/.config/polybar
+cat << 'EOF' > ~/.config/polybar/config
+[bar/example]
+width = 100%
+height = 30
+background = #222
+foreground = #fff
+modules-left = date
+modules-right = memory cpu
+font-0 = "DejaVu Sans:size=10"
+EOF
 
-echo "⚡ Делаем zsh по умолчанию..."
-chsh -s $(which zsh)
+echo "[6/9] Конфиг Picom..."
+mkdir -p ~/.config
+cat << 'EOF' > ~/.config/picom.conf
+backend = "glx";
+vsync = true;
+shadow = true;
+fading = true;
+blur-method = "gaussian";
+EOF
 
-echo "🎉 Готово! Перезагрузись или перезапусти i3 (Mod+Shift+R)."
+echo "[7/9] Ставим тему и иконки..."
+mkdir -p ~/.themes ~/.icons
+lxappearance
+
+echo "[8/9] Добавляем обои..."
+wget -O ~/wallpaper.jpg https://w.wallhaven.cc/full/ym/wallhaven-ymj5j7.jpg
+
+echo "[9/9] Готово! Перезагрузи X с i3"
+echo "После перезапуска введи: startx"
