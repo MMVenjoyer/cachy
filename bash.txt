@@ -1,0 +1,3 @@
+wget https://your-git-repo.com/macos-i3-setup.sh -O macos-i3-setup.sh
+chmod +x macos-i3-setup.sh
+./macos-i3-setup.sh
