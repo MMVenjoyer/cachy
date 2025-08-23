@@ -39,6 +39,24 @@ fi
 print_status "Обновление системы..."
 sudo pacman -Syu --noconfirm
 
+print_status "Определение аудиосистемы..."
+# Проверяем что установлено - PulseAudio или PipeWire
+if systemctl --user is-active --quiet pipewire-pulse.service || pgrep -f pipewire > /dev/null; then
+    print_status "Обнаружен PipeWire, используем pipewire-pulse..."
+    AUDIO_SYSTEM="pipewire"
+    sudo pacman -S --needed --noconfirm pipewire pipewire-pulse pipewire-alsa pavucontrol
+elif pgrep -f pulseaudio > /dev/null; then
+    print_status "Обнаружен PulseAudio..."
+    AUDIO_SYSTEM="pulseaudio"
+    sudo pacman -S --needed --noconfirm pulseaudio pulseaudio-alsa pavucontrol
+else
+    print_status "Аудиосистема не обнаружена, устанавливаем PipeWire (современное решение)..."
+    AUDIO_SYSTEM="pipewire"
+    # Удаляем PulseAudio если установлен
+    sudo pacman -Rns --noconfirm pulseaudio pulseaudio-alsa 2>/dev/null || true
+    sudo pacman -S --needed --noconfirm pipewire pipewire-pulse pipewire-alsa pavucontrol wireplumber
+fi
+
 print_status "Установка основных пакетов..."
 sudo pacman -S --noconfirm \
     i3-wm i3status i3lock \
@@ -51,7 +69,6 @@ sudo pacman -S --noconfirm \
     dunst \
     playerctl \
     brightnessctl \
-    pulseaudio pulseaudio-alsa pavucontrol \
     network-manager-applet \
     blueman \
     lxappearance \
@@ -85,6 +102,7 @@ if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
     makepkg -si --noconfirm
     cd ~
     AUR_HELPER="yay"
+fi
 elif command -v paru &> /dev/null; then
     AUR_HELPER="paru"
 else
@@ -226,7 +244,7 @@ bindsym $mod+Shift+l exec i3lock -c 000000
 bindsym XF86MonBrightnessUp exec brightnessctl set +5%
 bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
 
-# Управление звуком
+# Управление звуком (работает и с PulseAudio и с PipeWire)
 bindsym XF86AudioRaiseVolume exec pactl set-sink-volume @DEFAULT_SINK@ +5%
 bindsym XF86AudioLowerVolume exec pactl set-sink-volume @DEFAULT_SINK@ -5%
 bindsym XF86AudioMute exec pactl set-sink-mute @DEFAULT_SINK@ toggle
