@@ -88,7 +88,11 @@ sudo pacman -S --noconfirm \
     python-pip \
     python-i3ipc \
     base-devel \
-    git
+    git \
+    xorg-server \
+    xorg-xinit \
+    lightdm \
+    lightdm-gtk-greeter
 
 print_status "Проверка наличия AUR helper..."
 if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
@@ -945,7 +949,26 @@ redshift -l 51.1694:71.4491 &
 EOF
 chmod +x ~/.xprofile
 
-print_status "Создание .xinitrc..."
+print_status "Настройка Display Manager..."
+# Создаем .desktop файл для i3
+sudo mkdir -p /usr/share/xsessions
+sudo tee /usr/share/xsessions/i3.desktop << 'EOF'
+[Desktop Entry]
+Name=i3
+Comment=improved dynamic tiling window manager
+Exec=i3
+TryExec=i3
+Type=Application
+X-LightDM-DesktopName=i3
+DesktopNames=i3
+Keywords=tiling;wm;windowmanager;window;manager;
+EOF
+
+# Включаем LightDM
+sudo systemctl enable lightdm
+print_success "LightDM настроен и будет запущен при перезагрузке"
+
+print_status "Создание .xinitrc как резерв..."
 if [ ! -f ~/.xinitrc ]; then
     cat > ~/.xinitrc << 'EOF'
 #!/bin/sh
@@ -989,10 +1012,14 @@ EOF
 fi
 
 print_success "Установка завершена!"
-print_status "Перезагрузите систему и выберите i3 в менеджере входа в систему"
+print_status "Перезагружайтесь! В LightDM выберите сессию 'i3'"
 
 echo ""
 echo "🎉 Ваш macOS-подобный i3 готов к использованию!"
+echo ""
+echo "После перезагрузки:"
+echo "  1. Выберите сессию 'i3' в правом верхнем углу экрана входа"
+echo "  2. Введите пароль и войдите"
 echo ""
 echo "Основные хоткеи:"
 echo "  Cmd+Space        - Spotlight (поиск приложений)"
