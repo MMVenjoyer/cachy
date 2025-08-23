@@ -109,11 +109,29 @@ else
     AUR_HELPER="yay"
 fi
 
+print_status "Настройка аудиосистемы..."
+if [ "$AUDIO_SYSTEM" = "pipewire" ]; then
+    print_status "Настройка PipeWire..."
+    # Включаем сервисы PipeWire
+    systemctl --user enable --now pipewire.service
+    systemctl --user enable --now pipewire-pulse.service
+    systemctl --user enable --now wireplumber.service
+    
+    # Останавливаем PulseAudio если запущен
+    systemctl --user stop pulseaudio.service 2>/dev/null || true
+    systemctl --user disable pulseaudio.service 2>/dev/null || true
+    
+    print_success "PipeWire настроен и запущен"
+else
+    print_status "Настройка PulseAudio..."
+    # Включаем PulseAudio
+    systemctl --user enable --now pulseaudio.service
+    print_success "PulseAudio настроен и запущен"
+fi
 print_status "Установка дополнительных пакетов из AUR..."
 # Альтернативы для основных пакетов если AUR недоступен
 if command -v $AUR_HELPER &> /dev/null; then
     print_status "Установка через $AUR_HELPER..."
-    $AUR_HELPER -S --noconfirm \
         sf-pro-display-fonts \
         rofi-calc \
         i3-gaps-next-git \
