@@ -41,18 +41,17 @@ sudo pacman -Syu --noconfirm
 
 print_status "Определение аудиосистемы..."
 # Проверяем что установлено - PulseAudio или PipeWire
-if systemctl --user is-active --quiet pipewire-pulse.service || pgrep -f pipewire > /dev/null; then
+if systemctl --user is-active --quiet pipewire-pulse.service 2>/dev/null || pgrep -f pipewire > /dev/null 2>&1; then
     print_status "Обнаружен PipeWire, используем pipewire-pulse..."
     AUDIO_SYSTEM="pipewire"
     sudo pacman -S --needed --noconfirm pipewire pipewire-pulse pipewire-alsa pavucontrol
-elif pgrep -f pulseaudio > /dev/null; then
+elif pgrep -f pulseaudio > /dev/null 2>&1; then
     print_status "Обнаружен PulseAudio..."
-    AUDIO_SYSTEM="pulseaudio"
+    AUDIO_SYSTEM="pulseaudio" 
     sudo pacman -S --needed --noconfirm pulseaudio pulseaudio-alsa pavucontrol
 else
     print_status "Аудиосистема не обнаружена, устанавливаем PipeWire (современное решение)..."
     AUDIO_SYSTEM="pipewire"
-    # Удаляем PulseAudio если установлен
     sudo pacman -Rns --noconfirm pulseaudio pulseaudio-alsa 2>/dev/null || true
     sudo pacman -S --needed --noconfirm pipewire pipewire-pulse pipewire-alsa pavucontrol wireplumber
 fi
