@@ -55,10 +55,11 @@ sudo pacman -S --noconfirm \
     network-manager-applet \
     blueman \
     lxappearance \
-    arc-gtk-theme \
+    gtk-engine-murrine \
     papirus-icon-theme \
     ttf-fira-code \
     ttf-roboto \
+    ttf-dejavu \
     noto-fonts \
     noto-fonts-emoji \
     maim \
@@ -67,24 +68,87 @@ sudo pacman -S --noconfirm \
     arandr \
     neofetch \
     htop \
-    firefox
+    firefox \
+    python-pip \
+    python-i3ipc \
+    base-devel \
+    git
 
-print_status "Установка AUR helper (yay)..."
-if ! command -v yay &> /dev/null; then
+print_status "Проверка наличия AUR helper..."
+if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
+    print_status "Установка AUR helper (yay)..."
+    # Проверяем зависимости для сборки
+    sudo pacman -S --needed --noconfirm base-devel git
     cd /tmp
     git clone https://aur.archlinux.org/yay.git
     cd yay
     makepkg -si --noconfirm
     cd ~
+    AUR_HELPER="yay"
+elif command -v paru &> /dev/null; then
+    AUR_HELPER="paru"
+else
+    AUR_HELPER="yay"
 fi
 
 print_status "Установка дополнительных пакетов из AUR..."
-yay -S --noconfirm \
-    sf-pro-display-fonts \
-    rofi-calc \
-    i3-gaps-next-git \
-    autotiling
+# Альтернативы для основных пакетов если AUR недоступен
+if command -v $AUR_HELPER &> /dev/null; then
+    print_status "Установка через $AUR_HELPER..."
+    $AUR_HELPER -S --noconfirm \
+        sf-pro-display-fonts \
+        rofi-calc \
+        i3-gaps-next-git \
+        autotiling \
+        arc-gtk-theme-git || {
+        print_warning "Некоторые AUR пакеты не установились, используем альтернативы..."
+        # Устанавливаем альтернативы из официальных репозиториев
+        sudo pacman -S --noconfirm i3-gaps || sudo pacman -S --noconfirm i3-wm
+    }
+else
+    print_warning "AUR helper недоступен, используем пакеты из официальных репозиториев..."
+    sudo pacman -S --noconfirm i3-gaps || print_warning "i3-gaps недоступен, используется обычный i3"
+    
+    # Создаем autotiling скрипт вручную
+    print_status "Создание autotiling скрипта..."
+    sudo pip install autotiling 2>/dev/null || {
+        print_warning "pip недоступен, создаем простой autotiling скрипт..."
+        cat > ~/.local/bin/autotiling << 'AUTOTILING_EOF'
+#!/usr/bin/env python3
+import i3ipc
+import sys
 
+def on_window_focus(ipc, event):
+    try:
+        focused = ipc.get_tree().find_focused()
+        if focused.parent.layout in ['splitv', 'splith']:
+            if focused.rect.width > focused.rect.height:
+                focused.parent.command('split v')
+            else:
+                focused.parent.command('split h')
+    except:
+        pass
+
+def main():
+    ipc = i3ipc.Connection()
+    ipc.on('window::focus', on_window_focus)
+    ipc.main()
+
+if __name__ == '__main__':
+    main()
+AUTOTILING_EOF
+        chmod +x ~/.local/bin/autotiling
+        mkdir -p ~/.local/bin
+    }
+fi
+
+print_status "Настройка шрифтов..."
+# Используем системные шрифты если SF Pro недоступен
+FONT_FAMILY="SF Pro Display"
+if ! fc-list | grep -i "sf pro" > /dev/null 2>&1; then
+    print_warning "SF Pro Display недоступен, используем Roboto"
+    FONT_FAMILY="Roboto"
+fi
 # Создание директорий конфигурации
 print_status "Создание директорий конфигурации..."
 mkdir -p ~/.config/{i3,polybar,rofi,picom,dunst,alacritty}
@@ -99,7 +163,7 @@ set $mod Mod4
 set $alt Mod1
 
 # Шрифт
-font pango:SF Pro Display 11
+font pango:$FONT_FAMILY 11
 
 # Автозапуск
 exec --no-startup-id picom
@@ -109,7 +173,7 @@ exec --no-startup-id blueman-applet
 exec --no-startup-id redshift -l 51.1694:71.4491 # Координаты Кокшетау
 exec --no-startup-id feh --bg-scale ~/Pictures/Wallpapers/wallpaper.jpg
 exec --no-startup-id polybar main
-exec --no-startup-id autotiling
+exec_always --no-startup-id ~/.local/bin/autotiling 2>/dev/null || echo "autotiling недоступен"
 
 # Цвета в стиле macOS
 set $bg-color            #2c3e50
@@ -760,9 +824,21 @@ key_bindings:
 EOF
 
 print_status "Настройка GTK темы..."
-cat > ~/.config/gtk-3.0/settings.ini << 'EOF'
+# Проверяем доступные темы и выбираем подходящую
+if [ -d "/usr/share/themes/Arc-Dark" ]; then
+    GTK_THEME="Arc-Dark"
+elif [ -d "/usr/share/themes/Adwaita-dark" ]; then
+    GTK_THEME="Adwaita-dark"
+elif [ -d "/usr/share/themes/Breeze-Dark" ]; then
+    GTK_THEME="Breeze-Dark"
+else
+    GTK_THEME="Adwaita"
+    print_warning "Arc-Dark тема не найдена, используется $GTK_THEME"
+fi
+
+cat > ~/.config/gtk-3.0/settings.ini << EOF
 [Settings]
-gtk-theme-name=Arc-Dark
+gtk-theme-name=$GTK_THEME
 gtk-icon-theme-name=Papirus-Dark
 gtk-font-name=SF Pro Display 10
 gtk-cursor-theme-name=Adwaita
@@ -776,6 +852,24 @@ gtk-enable-input-feedback-sounds=1
 gtk-xft-antialias=1
 gtk-xft-hinting=1
 gtk-xft-hintstyle=hintfull
+EOF
+
+# Также создаем для GTK2
+cat > ~/.gtkrc-2.0 << EOF
+gtk-theme-name="$GTK_THEME"
+gtk-icon-theme-name="Papirus-Dark"
+gtk-font-name="SF Pro Display 10"
+gtk-cursor-theme-name="Adwaita"
+gtk-cursor-theme-size=0
+gtk-toolbar-style=GTK_TOOLBAR_BOTH
+gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
+gtk-button-images=1
+gtk-menu-images=1
+gtk-enable-event-sounds=1
+gtk-enable-input-feedback-sounds=1
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle="hintfull"
 EOF
 
 print_status "Загрузка обоев в стиле macOS..."
@@ -813,7 +907,7 @@ blueman-applet &
 redshift -l 51.1694:71.4491 &
 
 # Автотайлинг
-autotiling &
+~/.local/bin/autotiling 2>/dev/null &
 EOF
 chmod +x ~/.xprofile
 
