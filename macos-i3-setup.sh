@@ -101,7 +101,6 @@ if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
     makepkg -si --noconfirm
     cd ~
     AUR_HELPER="yay"
-fi
 elif command -v paru &> /dev/null; then
     AUR_HELPER="paru"
 else
